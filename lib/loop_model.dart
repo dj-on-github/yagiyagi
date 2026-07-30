@@ -36,7 +36,7 @@ class LoopParameters {
 /// and a feedpoint resistance near 100-120 ohm, which is why 75 ohm coax is
 /// the classic feed. Azimuth is a broad figure-8; elevation uses the same
 /// perfect-ground reflection factor as the dipole model.
-class LoopDesign implements AntennaDesign {
+class LoopDesign extends AntennaDesign {
   final LoopParameters p;
   LoopDesign(this.p);
 
@@ -83,16 +83,8 @@ class LoopDesign implements AntennaDesign {
   }
 
   @override
-  double elevationDb(double angleDeg) {
-    if (!overGround) return 0;
-    final a = angleDeg * pi / 180;
-    final sinEl = sin(a);
-    if (sinEl <= 0) return -40; // perfect ground: nothing below horizon
-    final gMax = 2 * sin(min(2 * pi * p.heightWl, pi / 2));
-    final g = 2 * sin(2 * pi * p.heightWl * sinEl).abs();
-    final gn = (g / gMax).clamp(1e-4, 1.0);
-    return (20 * log10(gn)).clamp(-40.0, 0.0);
-  }
+  double elevationDb(double angleDeg) =>
+      groundReflectionDb(angleDeg, p.heightWl);
 
   double get _freeSpaceROhms =>
       p.shape == LoopShape.circular ? 120.0 : 105.0;
@@ -112,12 +104,6 @@ class LoopDesign implements AntennaDesign {
   @override
   Impedance impedanceAt(double fMHz) =>
       rlcImpedance(fMHz, resonanceMHz, feedpointROhms, qFactor);
-
-  @override
-  double swrAt(double fMHz) => swrFromImpedance(impedanceAt(fMHz), feedOhms);
-
-  @override
-  double get centerSwr => swrAt(p.frequencyMHz);
 
   @override
   double get bandwidth2to1MHz => bandwidth2to1(resonanceMHz, swrAt);

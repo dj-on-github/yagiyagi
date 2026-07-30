@@ -24,7 +24,7 @@ class DipoleParameters {
 /// Azimuth uses the classic dipole element factor (figure-8); elevation is
 /// shown in the plane perpendicular to the wire, with a perfect-ground
 /// reflection factor when a height above ground is set.
-class DipoleDesign implements AntennaDesign {
+class DipoleDesign extends AntennaDesign {
   final DipoleParameters p;
   DipoleDesign(this.p);
 
@@ -68,16 +68,8 @@ class DipoleDesign implements AntennaDesign {
   }
 
   @override
-  double elevationDb(double angleDeg) {
-    if (!overGround) return 0; // perpendicular plane: omnidirectional
-    final a = angleDeg * pi / 180;
-    final sinEl = sin(a); // positive above horizon, negative below
-    if (sinEl <= 0) return -40; // perfect ground: nothing below horizon
-    final gMax = 2 * sin(min(2 * pi * p.heightWl, pi / 2));
-    final g = 2 * sin(2 * pi * p.heightWl * sinEl).abs();
-    final gn = (g / gMax).clamp(1e-4, 1.0);
-    return (20 * log10(gn)).clamp(-40.0, 0.0);
-  }
+  double elevationDb(double angleDeg) =>
+      groundReflectionDb(angleDeg, p.heightWl);
 
   @override
   double get feedpointROhms {
@@ -93,12 +85,6 @@ class DipoleDesign implements AntennaDesign {
   @override
   Impedance impedanceAt(double fMHz) =>
       rlcImpedance(fMHz, resonanceMHz, feedpointROhms, qFactor);
-
-  @override
-  double swrAt(double fMHz) => swrFromImpedance(impedanceAt(fMHz), feedOhms);
-
-  @override
-  double get centerSwr => swrAt(p.frequencyMHz);
 
   @override
   double get bandwidth2to1MHz => bandwidth2to1(resonanceMHz, swrAt);

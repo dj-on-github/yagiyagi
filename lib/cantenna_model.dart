@@ -25,7 +25,7 @@ class CantennaParameters {
 /// Covers TE11/TM01 cutoff behaviour, guide wavelength, aperture gain and
 /// a probe impedance model. Below the TE11 cutoff the guide is evanescent
 /// and the SWR climbs steeply - visible as a wall in the SWR plot.
-class CantennaDesign implements AntennaDesign {
+class CantennaDesign extends AntennaDesign {
   final CantennaParameters p;
   CantennaDesign(this.p);
 
@@ -114,12 +114,6 @@ class CantennaDesign implements AntennaDesign {
     }
     return rlcImpedance(fMHz, p.frequencyMHz, feedpointROhms, qFactor);
   }
-
-  @override
-  double swrAt(double fMHz) => swrFromImpedance(impedanceAt(fMHz), feedOhms);
-
-  @override
-  double get centerSwr => swrAt(p.frequencyMHz);
 
   @override
   double get bandwidth2to1MHz =>

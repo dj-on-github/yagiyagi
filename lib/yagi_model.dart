@@ -42,7 +42,7 @@ class YagiParameters {
 ///
 /// This is a parametric engineering approximation (empirical gain/bandwidth
 /// relations + a shaped two-lobe pattern model), not a full NEC/MoM solve.
-class YagiDesign implements AntennaDesign {
+class YagiDesign extends AntennaDesign {
   final YagiParameters p;
   YagiDesign(this.p);
 
@@ -119,13 +119,6 @@ class YagiDesign implements AntennaDesign {
     final z = rlcImpedance(fMHz, p.frequencyMHz, feedpointROhms, qFactor);
     return Impedance(z.r * transformRatio, z.x * transformRatio);
   }
-
-  @override
-  double swrAt(double fMHz) =>
-      swrFromImpedance(impedanceAt(fMHz), p.feedOhms);
-
-  @override
-  double get centerSwr => swrAt(p.frequencyMHz);
 
   /// Contiguous bandwidth around the center frequency where SWR <= 2:1.
   @override

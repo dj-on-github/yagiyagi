@@ -105,7 +105,7 @@ class SwrImpedancePainter extends CustomPainter {
     if (plot.width < 40 || plot.height < 40) return;
 
     final fc = design.centerFrequencyMHz;
-    final fMin = fc * 0.88, fMax = fc * 1.12;
+    final fMin = design.sweepMinMHz, fMax = design.sweepMaxMHz;
     double fx(double f) => plot.left + (f - fMin) / (fMax - fMin) * plot.width;
     double fySwr(double s) =>
         plot.bottom - ((s - 1) / (swrMax - 1)).clamp(0.0, 1.0) * plot.height;
@@ -131,14 +131,30 @@ class SwrImpedancePainter extends CustomPainter {
           ..style = PaintingStyle.stroke
           ..color = Colors.white.withValues(alpha: 0.25));
 
+    // Tick precision follows the span: a magnetic loop needs kHz resolution,
+    // a log-periodic sweeps hundreds of MHz.
+    final span = fMax - fMin;
+    final digits = span > 200
+        ? 0
+        : span > 20
+            ? 1
+            : span > 2
+                ? 2
+                : span > 0.2
+                    ? 3
+                    : 4;
+
     // vertical frequency grid (8 divisions)
     for (var i = 0; i <= 8; i++) {
-      final f = fMin + (fMax - fMin) * i / 8;
+      final f = fMin + span * i / 8;
       final x = fx(f);
       canvas.drawLine(
           Offset(x, plot.top), Offset(x, plot.bottom), gridPaint);
-      _text(canvas, Offset(x, plot.bottom + 6), f.toStringAsFixed(1), 10,
-          color: Colors.white70, align: TextAlign.center);
+      // Long labels get thinned out so they cannot collide.
+      if (digits < 3 || i.isEven) {
+        _text(canvas, Offset(x, plot.bottom + 6), f.toStringAsFixed(digits), 10,
+            color: Colors.white70, align: TextAlign.center);
+      }
     }
 
     // left SWR axis
