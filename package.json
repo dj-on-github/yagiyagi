@@ -1,0 +1,9 @@
+{
+  "name": "yagiyagi",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Yagi-Uda antenna designer (Flutter). npm run dev bridges to flutter run -d web-server so the app is previewable like a web dev server.",
+  "scripts": {
+    "dev": "flutter run -d web-server"
+  }
+}
