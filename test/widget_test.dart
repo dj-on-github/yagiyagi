@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yagiyagi/antenna_design.dart';
@@ -186,6 +187,115 @@ void main() {
         .first);
     expect((reset.painter as ScenePainter).camera.yawDeg,
         (before.painter as ScenePainter).camera.yawDeg);
+  });
+
+  testWidgets('The wheel zooms inside the 3D view and scrolls outside it',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1400, 1000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(const YagiApp());
+    await tester.drag(
+        find.byType(SingleChildScrollView).last, const Offset(0, -2000));
+    await tester.pumpAndSettle();
+
+    final view = find.byType(AntennaView3d);
+    double cameraDistance() => (tester
+            .widget<CustomPaint>(
+                find.descendant(of: view, matching: find.byType(CustomPaint)).first)
+            .painter as ScenePainter)
+        .camera
+        .distance;
+
+    final mouse = TestPointer(1, PointerDeviceKind.mouse);
+
+    // Over the 3D view: the camera moves and the column stays put.
+    final anchorBefore = tester.getTopLeft(find.text('Antenna geometry'));
+    final distanceBefore = cameraDistance();
+    mouse.hover(tester.getCenter(view));
+    await tester.sendEventToBinding(mouse.scroll(const Offset(0, 160)));
+    await tester.pumpAndSettle();
+
+    expect(cameraDistance(), isNot(distanceBefore),
+        reason: 'the wheel should zoom the 3D view');
+    expect(tester.getTopLeft(find.text('Antenna geometry')), anchorBefore,
+        reason: 'the plot column must not scroll while zooming');
+
+    // Over the card's title, just outside the 3D view: the column scrolls
+    // and the camera holds.
+    final zoomed = cameraDistance();
+    mouse.hover(tester.getCenter(find.text('Antenna geometry')));
+    await tester.sendEventToBinding(mouse.scroll(const Offset(0, -160)));
+    await tester.pumpAndSettle();
+
+    expect(tester.getTopLeft(find.text('Antenna geometry')),
+        isNot(anchorBefore),
+        reason: 'the wheel should still scroll the column outside the view');
+    expect(cameraDistance(), zoomed,
+        reason: 'scrolling elsewhere must not move the camera');
+  });
+
+  testWidgets('A trackpad zooms the 3D view without scrolling the column',
+      (tester) async {
+    // macOS sends trackpad gestures as pan/zoom pointer events rather than
+    // scroll signals; the web build sends wheel events for the same gesture.
+    await tester.binding.setSurfaceSize(const Size(1400, 1000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(const YagiApp());
+    await tester.drag(
+        find.byType(SingleChildScrollView).last, const Offset(0, -2000));
+    await tester.pumpAndSettle();
+
+    final view = find.byType(AntennaView3d);
+    double cameraDistance() => (tester
+            .widget<CustomPaint>(find
+                .descendant(of: view, matching: find.byType(CustomPaint))
+                .first)
+            .painter as ScenePainter)
+        .camera
+        .distance;
+
+    final anchor = tester.getTopLeft(find.text('Antenna geometry'));
+    final before = cameraDistance();
+
+    final pad = TestPointer(1, PointerDeviceKind.trackpad);
+    final centre = tester.getCenter(view);
+    // Move the mouse in first: that is what locks the column's scrolling.
+    final mouse = TestPointer(2, PointerDeviceKind.mouse);
+    await tester.sendEventToBinding(mouse.hover(centre));
+    await tester.pumpAndSettle();
+
+    // Two fingers moving down zooms in, matching what the same gesture does
+    // to the web build through the wheel path.
+    await tester.sendEventToBinding(pad.panZoomStart(centre));
+    await tester.sendEventToBinding(
+        pad.panZoomUpdate(centre, pan: const Offset(0, 60)));
+    await tester.pumpAndSettle();
+
+    expect(cameraDistance(), lessThan(before),
+        reason: 'a two-finger scroll should zoom in');
+    expect(tester.getTopLeft(find.text('Antenna geometry')), anchor,
+        reason: 'the plot column must not scroll while the trackpad zooms');
+
+    // Fingers back up zooms out again.
+    final zoomedIn = cameraDistance();
+    await tester.sendEventToBinding(
+        pad.panZoomUpdate(centre, pan: const Offset(0, -30)));
+    await tester.pumpAndSettle();
+    expect(cameraDistance(), greaterThan(zoomedIn),
+        reason: 'reversing the gesture should zoom back out');
+
+    // Pinching apart zooms in.
+    final panned = cameraDistance();
+    await tester.sendEventToBinding(
+        pad.panZoomUpdate(centre, pan: const Offset(0, -30), scale: 1.6));
+    await tester.pumpAndSettle();
+    expect(cameraDistance(), lessThan(panned),
+        reason: 'a pinch should zoom too');
+
+    await tester.sendEventToBinding(pad.panZoomEnd());
+    await tester.pumpAndSettle();
   });
 
   testWidgets('Every antenna type can be selected in turn', (tester) async {

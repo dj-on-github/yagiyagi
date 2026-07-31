@@ -77,6 +77,12 @@ class _DesignerPageState extends State<DesignerPage> {
   final ScrollController _leftScroll = ScrollController();
   final ScrollController _rightScroll = ScrollController();
 
+  /// True while the pointer is inside the 3D view. Wheel signals are already
+  /// claimed there by the pointer-signal resolver, but a trackpad arrives as
+  /// pan/zoom pointer events, which the plot column's drag recognizer would
+  /// otherwise turn into a scroll while the model is being zoomed.
+  bool _pointerInRenderView = false;
+
   AntennaDesign get _d => switch (_type) {
         AntennaType.yagi => YagiDesign(_yagi),
         AntennaType.dipole => DipoleDesign(_dipole),
@@ -177,6 +183,9 @@ class _DesignerPageState extends State<DesignerPage> {
                 child: SingleChildScrollView(
                   controller: _rightScroll,
                   padding: const EdgeInsets.only(right: 12),
+                  physics: _pointerInRenderView
+                      ? const NeverScrollableScrollPhysics()
+                      : null,
                   child: _plotsColumn(d),
                 ),
               ),
@@ -282,10 +291,14 @@ class _DesignerPageState extends State<DesignerPage> {
               style: const TextStyle(fontSize: 12, color: Colors.white70),
             ),
             const SizedBox(height: 8),
-            SizedBox(
-              height: 420,
-              width: double.infinity,
-              child: AntennaView3d(scene: scene, framingKey: _type),
+            MouseRegion(
+              onEnter: (_) => _update(() => _pointerInRenderView = true),
+              onExit: (_) => _update(() => _pointerInRenderView = false),
+              child: SizedBox(
+                height: 420,
+                width: double.infinity,
+                child: AntennaView3d(scene: scene, framingKey: _type),
+              ),
             ),
           ],
         ),

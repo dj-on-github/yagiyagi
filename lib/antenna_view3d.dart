@@ -9,7 +9,11 @@ import 'scene3d.dart';
 /// Interactive 3D view of the selected antenna.
 ///
 /// Left-drag orbits, right-drag (or shift-drag) pans, the wheel zooms and a
-/// double-click puts it back. The camera fits itself to the scene on every
+/// double-click puts it back. Wheel events inside the panel are claimed for
+/// zooming, so the page does not scroll out from under the pointer; outside
+/// it they scroll the column as usual.
+///
+/// The camera fits itself to the scene on every
 /// frame and zoom is a multiplier on that fit, so retuning an antenna -
 /// which can change every dimension by an order of magnitude - keeps the
 /// framing rather than throwing the model off the panel.
@@ -144,9 +148,41 @@ class _AntennaView3dState extends State<AntennaView3d> {
     if (_touches.isEmpty) _lastDrag = null;
   }
 
+  /// Cumulative pinch scale within the current trackpad gesture.
+  double _panZoomScale = 1.0;
+
+  void _onPanZoomStart(PointerPanZoomStartEvent e) => _panZoomScale = 1.0;
+
+  /// macOS delivers trackpad gestures as pan/zoom pointer events rather than
+  /// scroll signals. The web build turns the same trackpad into DOM wheel
+  /// events, which is why the wheel path alone worked there and nowhere else.
+  void _onPanZoomUpdate(PointerPanZoomUpdateEvent e) {
+    if (e.panDelta.dy != 0) {
+      // panDelta follows the fingers, scrollDelta opposes them; negate so a
+      // two-finger scroll zooms the same way the wheel does.
+      _zoomBy(exp(-e.panDelta.dy * 0.0016));
+    }
+    if (e.scale > 0 && (e.scale - _panZoomScale).abs() > 1e-6) {
+      _zoomBy(_panZoomScale / e.scale);
+      _panZoomScale = e.scale;
+    }
+  }
+
   void _onPointerSignal(PointerSignalEvent e) {
-    if (e is! PointerScrollEvent) return;
-    _zoomBy(exp(e.scrollDelta.dy * 0.0016));
+    if (e is! PointerScrollEvent && e is! PointerScaleEvent) return;
+    // Claim the event, or the surrounding scroll view acts on it as well and
+    // the panel scrolls away while it zooms. The resolver calls only the
+    // first handler to register, and this Listener is deeper in the hit-test
+    // path than the Scrollable, so it registers first.
+    GestureBinding.instance.pointerSignalResolver.register(e, (event) {
+      if (event is PointerScrollEvent) {
+        _zoomBy(exp(event.scrollDelta.dy * 0.0016));
+      } else if (event is PointerScaleEvent) {
+        // Trackpad pinch: a scale above 1 means closer, so shorter camera
+        // distance.
+        _zoomBy(1 / event.scale.clamp(0.2, 5.0));
+      }
+    });
   }
 
   /// Camera distance that frames the scene's projected extent, rather than
@@ -197,6 +233,8 @@ class _AntennaView3dState extends State<AntennaView3d> {
         onPointerUp: _onPointerUp,
         onPointerCancel: _onPointerUp,
         onPointerSignal: _onPointerSignal,
+        onPointerPanZoomStart: _onPanZoomStart,
+        onPointerPanZoomUpdate: _onPanZoomUpdate,
         child: GestureDetector(
           onDoubleTap: _reset,
           child: MouseRegion(
