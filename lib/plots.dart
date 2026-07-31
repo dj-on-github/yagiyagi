@@ -291,4 +291,7 @@ void _text(Canvas canvas, Offset at, String s, double size,
   var dx = at.dx;
   if (align == TextAlign.center) dx -= tp.width / 2;
   tp.paint(canvas, Offset(dx, at.dy));
+  // TextPainter holds a native dart:ui paragraph; without this the plots
+  // leak native memory on every repaint until Windows kills the process.
+  tp.dispose();
 }
