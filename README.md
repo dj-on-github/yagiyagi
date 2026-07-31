@@ -38,6 +38,13 @@ Select the antenna type from the pull-down at the top of the left panel:
   reference line. The swept span follows the design: ±12 % by default, a
   fraction of a percent for a magnetic loop, and the whole design decade plus
   its roll-off for a log-periodic.
+- **Antenna geometry** — an interactive 3D drawing of the antenna, built to
+  scale from the same parameters that drive the plots. Drag to orbit,
+  right-drag or shift-drag to pan, scroll to zoom, double-click to reset.
+  The pale teal axis is boresight, so it lines up with 0° on the polar
+  plots. Everything is drawn in the app's world frame: +x boresight, +y
+  across, +z up. Conductor diameters are true to scale until they would fall
+  below about a pixel, at which point they are held at a legible minimum.
 
 The left settings column and the right plot column each have their own
 independent scroll bar, so the app stays usable on smaller laptop screens.
@@ -112,10 +119,20 @@ lib/
   panels/              One settings panel per antenna type
   <name>_model.dart    One parametric model per antenna type
   plots.dart           Custom painters: polar gain plots, impedance/SWR chart
+  scene3d.dart         Small software 3D renderer: vectors, primitives,
+                       orbiting camera, depth-sorted painter
+  antenna_shapes.dart  Geometry builder for each antenna type
+  antenna_view3d.dart  The interactive 3D panel (orbit / pan / zoom)
 test/
   widget_test.dart     Widget tests
   models_test.dart     Model physics and numerics tests
+  scene_test.dart      3D geometry and projection tests
 ```
+
+The 3D view is deliberately a few hundred lines of `CustomPainter` rather
+than a 3D package: antennas are rods, loops and flat panels, and for those a
+back-to-front painter's algorithm with one fixed light is enough. It adds no
+dependencies and no platform-specific code.
 
 ## Adding a new antenna type
 
@@ -131,8 +148,13 @@ test/
 4. In `main.dart`: hold a parameters instance and add a branch to the `_d`
    and `_typeCards` switches. Both are exhaustive, so the compiler will
    point at anything missed.
-5. Add a widget test that selects the new type and checks its panels, and
-   model tests for whatever the model claims to get right.
+5. Add a branch to `_shapeFor` in `antenna_shapes.dart` that builds the 3D
+   geometry from the helpers there (`_rod`, `_ring`, `_disc`, `_quad`,
+   `_box`, `_ground`, …). Rod thickness and the boresight marker are added
+   automatically.
+6. Add a widget test that selects the new type and checks its panels, plus
+   model tests for whatever the model claims to get right. `scene_test.dart`
+   covers every type from `designsByType()`, so add the new one there too.
 
 The plots and summaries work automatically through the `AntennaDesign`
 interface.

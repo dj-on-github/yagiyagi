@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yagiyagi/antenna_design.dart';
+import 'package:yagiyagi/antenna_view3d.dart';
 import 'package:yagiyagi/main.dart';
+import 'package:yagiyagi/scene3d.dart';
 
 void main() {
   testWidgets('Yagi designer renders settings and plots', (tester) async {
@@ -145,6 +147,46 @@ void main() {
       expect(find.text('Impedance & SWR vs frequency'), findsOneWidget);
     });
   }
+
+  testWidgets('The 3D view sits below the plots and responds to the mouse',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1400, 1000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(const YagiApp());
+
+    // It is the last card in the right-hand column.
+    final plots = find.byType(SingleChildScrollView).last;
+    await tester.drag(plots, const Offset(0, -2000));
+    await tester.pumpAndSettle();
+    expect(find.text('Antenna geometry'), findsOneWidget);
+
+    final view = find.byType(AntennaView3d);
+    expect(view, findsOneWidget);
+
+    // Orbiting must not throw and must actually repaint.
+    final before = tester.widget<CustomPaint>(find
+        .descendant(of: view, matching: find.byType(CustomPaint))
+        .first);
+    await tester.drag(view, const Offset(60, 25));
+    await tester.pumpAndSettle();
+    final after = tester.widget<CustomPaint>(find
+        .descendant(of: view, matching: find.byType(CustomPaint))
+        .first);
+    expect((before.painter as ScenePainter).camera.yawDeg,
+        isNot((after.painter as ScenePainter).camera.yawDeg));
+
+    // Double-click puts the camera back.
+    await tester.tap(view);
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.tap(view);
+    await tester.pumpAndSettle();
+    final reset = tester.widget<CustomPaint>(find
+        .descendant(of: view, matching: find.byType(CustomPaint))
+        .first);
+    expect((reset.painter as ScenePainter).camera.yawDeg,
+        (before.painter as ScenePainter).camera.yawDeg);
+  });
 
   testWidgets('Every antenna type can be selected in turn', (tester) async {
     await tester.binding.setSurfaceSize(const Size(1400, 1000));

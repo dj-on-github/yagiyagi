@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import 'antenna_design.dart';
+import 'antenna_shapes.dart';
+import 'antenna_view3d.dart';
 import 'cantenna_model.dart';
 import 'corner_reflector_model.dart';
 import 'dipole_model.dart';
@@ -243,6 +245,7 @@ class _DesignerPageState extends State<DesignerPage> {
           300,
           SwrImpedancePainter(design: d),
         ),
+        _renderCard(d),
         const Padding(
           padding: EdgeInsets.only(bottom: 16),
           child: Text(
@@ -252,6 +255,41 @@ class _DesignerPageState extends State<DesignerPage> {
           ),
         ),
       ],
+    );
+  }
+
+  /// Interactive 3D drawing of the current antenna, at the foot of the plot
+  /// column. The scene is rebuilt from the live design, so it tracks every
+  /// slider; the camera lives in the view's own state and only reframes when
+  /// the antenna type changes.
+  Widget _renderCard(AntennaDesign d) {
+    final scene = buildScene(_type, d);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Antenna geometry',
+                style:
+                    TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 2),
+            Text(
+              'Drag to orbit · right-drag or shift-drag to pan · '
+              'scroll to zoom · double-click to reset. The teal axis is '
+              'boresight, the 0° direction on the polar plots'
+              '${scene.note == null ? '.' : ' — ${scene.note}'}',
+              style: const TextStyle(fontSize: 12, color: Colors.white70),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 420,
+              width: double.infinity,
+              child: AntennaView3d(scene: scene, framingKey: _type),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
