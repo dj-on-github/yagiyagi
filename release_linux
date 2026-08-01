@@ -1,0 +1,123 @@
+#!/usr/bin/env python3
+"""
+release_linux <version_string>
+
+Build and package a Linux release of a flutter app as a portable AppImage.
+
+    ./release_linux v1.1.0
+
+Steps:
+  1. Parse the version string  v<a>.<b>.<c>.
+  2. flutter build linux --release
+  3. Copy the build bundle into a fresh  ~/src/{appname}_<a>.<b>.<c>.AppDir
+  4. Copy the app icon into the AppDir.
+  5. Write {appname}.desktop into the AppDir.
+  6. appimagetool  ->  ~/src/{appname}_<a>.<b>.<c>.AppImage
+
+Run it from anywhere; it operates on the project directory the script lives in.
+This script only runs on Linux and needs `flutter` and `appimagetool-x86_64.AppImage`
+on PATH.
+"""
+
+import os
+import re
+import shutil
+import subprocess
+import sys
+
+appname="yagiyagi"
+
+def fail(msg):
+    print(f"release_linux: error: {msg}", file=sys.stderr)
+    sys.exit(1)
+
+
+def run(cmd):
+    """Run a command, echoing it; abort the release on failure."""
+    print("+ " + " ".join(cmd))
+    try:
+        subprocess.run(cmd, check=True)
+    except FileNotFoundError:
+        fail(f"command not found: {cmd[0]} (is it installed and on PATH?)")
+    except subprocess.CalledProcessError as e:
+        fail(f"command failed (exit {e.returncode}): {' '.join(cmd)}")
+
+
+def main():
+    if not sys.platform.startswith("linux"):
+        fail("this release script only runs on Linux")
+
+    if len(sys.argv) != 2:
+        fail("usage: release_linux v<a>.<b>.<c>   (e.g. v1.1.0)")
+    version = sys.argv[1]
+
+    print("---- 1) extract the version numbers: v<a>.<b>.<c> ----")
+    m = re.fullmatch(r"v(\d+)\.(\d+)\.(\d+)", version)
+    if not m:
+        fail(f"version '{version}' must be of the form v<a>.<b>.<c> (e.g. v1.1.0)")
+    a, b, c = m.group(1), m.group(2), m.group(3)
+    abc = f"{a}.{b}.{c}"
+    ab = f"{a}.{b}"
+    print(f"Releasing {appname} {version}  (a={a}, b={b}, c={c})")
+
+    # operate on the project (the directory this script lives in)
+    root = os.path.dirname(os.path.abspath(__file__))
+    os.chdir(root)
+
+    print("---- 2) build the Linux release ----")
+    run(["flutter", "build", "linux", "--release"])
+    bundle = "build/linux/x64/release/bundle"
+    if not os.path.isdir(bundle):
+        fail(f"build did not produce {bundle}")
+
+    print("---- 3) copy the bundle into a fresh AppDir ----")
+    # The AppDir lives beside the project (e.g. ~/src/appname_1.1.0.AppDir).
+    appdir = os.path.join(os.path.dirname(root), f"{appname}_{abc}.AppDir")
+    if os.path.islink(appdir):
+        os.unlink(appdir)
+    elif os.path.isdir(appdir):
+        shutil.rmtree(appdir)
+    # cp -r <bundle> <appdir>: appdir does not exist, so it is created as a
+    # copy of the bundle's contents (the executable, lib/, data/).
+    run(["cp", "-r", bundle, appdir])
+
+    print("---- 4) copy the icon (reuse the iOS 1024x1024 app icon) ----")
+    icon_src = "ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-1024x1024@1x.png"
+    if not os.path.isfile(icon_src):
+        fail(f"icon not found: {icon_src}")
+    run(["cp", icon_src, os.path.join(appdir, f"{appname}.png")])
+
+    print("---- 5) write the .desktop entry ----")
+    desktop = os.path.join(appdir, f"{appname}.desktop")
+    with open(desktop, "w") as f:
+        f.write(
+            "[Desktop Entry]\n"
+            f"Version=1.5\n"
+            "Type=Application\n"
+            "Terminal=false\n"
+            f"Name={appname}\n"
+            f"Exec={appname}\n"
+            f"Icon={appname}\n"
+            "Categories=Utility;\n"
+        )
+    print(f"+ wrote {desktop}")
+
+    # appimagetool needs an AppRun at the AppDir root; if one isn't present,
+    # add a symlink to the executable so the AppImage is runnable.
+    apprun = os.path.join(appdir, "AppRun")
+    if not os.path.lexists(apprun):
+        os.symlink(f"{appname}", apprun)
+        print(f"+ created AppRun -> {appname}")
+
+    print("---- 6) build the AppImage ----")
+    appimage = os.path.join(os.path.dirname(root), f"{appname}_{abc}.AppImage")
+    if os.path.exists(appimage):
+        os.remove(appimage)
+    run(["appimagetool-x86_64.AppImage", appdir, appimage])
+
+    print(f"\nDone. Built {appimage}")
+
+    print(f"\nDone. Built and packaged {appimage}.")
+
+if __name__ == "__main__":
+    main()

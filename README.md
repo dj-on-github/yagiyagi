@@ -53,6 +53,25 @@ independent scroll bar, so the app stays usable on smaller laptop screens.
 > exploration and intuition-building, not final engineering. Verify real
 > designs in NEC/4nec2 or a similar full-wave solver before cutting metal.
 
+## App icon
+
+The icon is a Yagi in profile — boom, four elements shortening towards the
+front, and the beam leaving the director end. It is drawn as vector artwork
+in [`tool/generate_icons.dart`](tool/generate_icons.dart) rather than kept as
+a binary master, so it can be retouched in code and regenerated:
+
+```bash
+flutter test tool/generate_icons.dart
+```
+
+That writes all 33 platform files — the macOS asset catalog (rounded, with a
+margin), the iOS and Android sets, the web icons including maskable variants,
+and the Windows `.ico` — plus a contact sheet at `build/icon_preview.png` for
+checking legibility at small sizes. Below 24 px the artwork automatically
+switches to a simplified three-element cut, because four elements smear
+together at favicon size. The generator lives in `tool/` rather than `test/`
+so a normal `flutter test` run does not rewrite the icons.
+
 ## Requirements
 
 - [Flutter](https://docs.flutter.dev/get-started/install) 3.35 or newer

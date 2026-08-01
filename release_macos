@@ -1,0 +1,108 @@
+#!/usr/bin/env python3
+"""
+release_macos <version_string>
+
+Build and package a macOS release of a flutter app.
+
+    ./release_macos v1.2.4
+
+Steps:
+  1. Parse the version string  v<a>.<b>.<c>.
+  2. flutter build macos --release
+  3. create-dmg  ->  ~/Desktop/{appname}_<a>.<b>.<c>.dmg
+
+Run it from anywhere; it operates on the project directory the script lives in.
+This script only works on macOS and needs `flutter` and `create-dmg` on PATH.
+"""
+
+import os
+import re
+import shutil
+import subprocess
+import sys
+
+appname="yagiyagi"
+
+def fail(msg):
+    print(f"release_macos: error: {msg}", file=sys.stderr)
+    sys.exit(1)
+
+
+def run(cmd):
+    """Run a command, echoing it; abort the release on failure."""
+    print("+ " + " ".join(cmd))
+    try:
+        subprocess.run(cmd, check=True)
+    except FileNotFoundError:
+        fail(f"command not found: {cmd[0]} (is it installed and on PATH?)")
+    except subprocess.CalledProcessError as e:
+        fail(f"command failed (exit {e.returncode}): {' '.join(cmd)}")
+
+
+def main():
+    if sys.platform != "darwin":
+        fail("this release script only runs on macOS")
+
+    if len(sys.argv) != 2:
+        fail("usage: release_macos v<a>.<b>.<c>   (e.g. v1.2.4)")
+    version = sys.argv[1]
+
+    # ---- 1) extract the version numbers: v<a>.<b>.<c> ----
+    print("1. Parse the version string  v<a>.<b>.<c>.")
+    m = re.fullmatch(r"v(\d+)\.(\d+)\.(\d+)", version)
+    if not m:
+        fail(f"version '{version}' must be of the form v<a>.<b>.<c> (e.g. v1.2.4)")
+    a, b, c = m.group(1), m.group(2), m.group(3)
+    abc = f"{a}.{b}.{c}"
+    print(f"Releasing {appname} {version}  (a={a}, b={b}, c={c})")
+
+    # operate on the project (the directory this script lives in)
+    root = os.path.dirname(os.path.abspath(__file__))
+    os.chdir(root)
+
+    # ---- 2) build the macOS release ----
+    print("2. flutter build macos --release")
+    run(["flutter", "build", "macos", "--release"])
+    built_app = f"build/macos/Build/Products/Release/{appname}.app"
+    if not os.path.isdir(built_app):
+        fail(f"build did not produce {built_app}")
+
+    # Stage the freshly built .app where create-dmg expects it, so the dmg
+    # packages this build (the build output and the create-dmg source differ).
+    colateral = os.path.join("release", f"{appname}_release_colateral")
+    if not os.path.isdir(colateral):
+        fail(f"missing colateral directory: {colateral}")
+    staged_app = os.path.join(colateral, f"{appname}.app")
+    if os.path.islink(staged_app):
+        os.unlink(staged_app)
+    elif os.path.isdir(staged_app):
+        shutil.rmtree(staged_app)
+    print(f"+ copy {built_app} -> {staged_app}")
+    shutil.copytree(built_app, staged_app, symlinks=True)
+
+    # ---- 3) create the dmg ----
+    print(f"3. create-dmg  ->  ~/Desktop/{appname}_<a>.<b>.<c>.dmg")
+    dmg = os.path.expanduser(f"~/Desktop/{appname}_{abc}.dmg")
+    if os.path.exists(dmg):
+        os.remove(dmg)  # create-dmg refuses to overwrite an existing file
+    run([
+        "create-dmg",
+        # hdiutil's internet-enable was removed in macOS 10.15 and now prints
+        # a noisy warning. Skip it.
+        "--no-internet-enable",
+        "--volname", f"{appname} {abc} Installer",
+        "--background", f"release/{appname}_release_colateral/dmg_background_7b5.png",
+        "--window-pos", "200", "120",
+        "--window-size", "480", "400",  # match the background image size. PNG is 960x686 
+        "--icon-size", "80",
+        "--icon", f"{appname}.app", "10", "200",   # left of the arrow tail
+        "--app-drop-link", "300", "200",           # right of the arrow tip
+        dmg,
+        f"release/{appname}_release_colateral/{appname}.app",
+    ])
+
+    print(f"\nDone. Built and packaged {dmg} for Version {version}.")
+
+
+if __name__ == "__main__":
+    main()
