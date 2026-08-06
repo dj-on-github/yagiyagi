@@ -1,0 +1,56 @@
+name: Web Build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'lib/**'
+      - 'web/**'
+      - 'test/**'
+      - 'tool/**'
+      - 'pubspec.yaml'
+      - 'pubspec.lock'
+      - '.github/workflows/web-build.yaml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: web-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Build the Flutter web app and publish it into docs/app for GitHub Pages.
+  # Only the latest build is kept (the previous one is replaced each run).
+  # ---------------------------------------------------------------------------
+  build-web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build Web
+        run: flutter build web --release --base-href "/${{ github.event.repository.name }}/app/"
+
+      - name: Publish web build to docs/app
+        run: |
+          # Replace the previous web build so only the latest version is kept.
+          rm -rf docs/app
+          mkdir -p docs/app
+          cp -r build/web/* docs/app/
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/app
+          git commit -m "Deploy web build ${{ github.sha }}" || echo "No changes to commit"
+          git push origin main

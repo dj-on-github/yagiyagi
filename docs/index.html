@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Antenna Designer</title>
+  <meta name="description" content="An interactive antenna analysis tool for amateur radio. Explore Yagi, dipole, loop, vertical, log-periodic, parabolic, helix, patch and more — with live radiation patterns, impedance/SWR plots and a 3D geometry view." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0a0f1a;
+      --bg-2: #0e1626;
+      --panel: #121c30;
+      --panel-2: #16223a;
+      --ink: #e6ecf7;
+      --ink-soft: #a7b4cc;
+      --ink-faint: #6c7a95;
+      --signal: #34d399;      /* emerald signal trace */
+      --signal-dark: #10b981;
+      --beam: #38bdf8;        /* cyan beam */
+      --warn: #f59e0b;        /* amber SWR */
+      --border: #223150;
+      --grid: rgba(56, 189, 248, 0.08);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      line-height: 1.65;
+      background-image:
+        radial-gradient(1200px 600px at 80% -10%, rgba(56,189,248,0.10), transparent 60%),
+        radial-gradient(900px 500px at -10% 10%, rgba(52,211,153,0.08), transparent 55%),
+        repeating-linear-gradient(0deg, var(--grid) 0, var(--grid) 1px, transparent 1px, transparent 32px),
+        repeating-linear-gradient(90deg, var(--grid) 0, var(--grid) 1px, transparent 1px, transparent 32px);
+    }
+    a { color: var(--beam); }
+
+    h1, h2, h3 { font-family: "Orbitron", "Inter", sans-serif; letter-spacing: 0.02em; }
+
+    /* Header */
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 14px 24px;
+      background: rgba(10, 15, 26, 0.82);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--border);
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: "Orbitron", sans-serif;
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--ink);
+      line-height: 1;
+    }
+    .brand .antenna { font-size: 1.3rem; }
+    a.button {
+      display: inline-block;
+      background: linear-gradient(135deg, var(--signal), var(--signal-dark));
+      color: #05140e;
+      text-decoration: none;
+      padding: 11px 24px;
+      border-radius: 999px;
+      font-family: "Inter", sans-serif;
+      font-size: 1rem;
+      font-weight: 700;
+      white-space: nowrap;
+      box-shadow: 0 0 0 1px rgba(52,211,153,0.4), 0 8px 24px rgba(16,185,129,0.25);
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    a.button:hover { transform: translateY(-1px); box-shadow: 0 0 0 1px rgba(52,211,153,0.6), 0 12px 30px rgba(16,185,129,0.35); }
+
+    /* Layout */
+    main {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 0 24px 80px;
+    }
+
+    /* Hero */
+    .hero {
+      padding: 72px 0 40px;
+      text-align: center;
+    }
+    .callsign {
+      display: inline-block;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.9rem;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      color: var(--signal);
+      margin-bottom: 14px;
+    }
+    .hero h1 {
+      font-size: 3.1rem;
+      margin: 0 0 16px;
+      line-height: 1.08;
+      color: var(--ink);
+    }
+    .hero h1 .accent {
+      background: linear-gradient(120deg, var(--beam), var(--signal));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+    .hero p.tagline {
+      color: var(--ink-soft);
+      font-size: 1.2rem;
+      max-width: 680px;
+      margin: 0 auto 32px;
+    }
+    .cta-row {
+      display: flex;
+      justify-content: center;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+    a.button.big { padding: 15px 38px; font-size: 1.12rem; }
+    a.ghost {
+      display: inline-block;
+      padding: 15px 30px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      color: var(--ink);
+      text-decoration: none;
+      font-weight: 600;
+      background: var(--panel);
+      transition: border-color 0.15s ease, background 0.15s ease;
+    }
+    a.ghost:hover { border-color: var(--beam); background: var(--panel-2); }
+
+    /* Sections */
+    section { margin-top: 64px; }
+    section h2 {
+      font-size: 1.7rem;
+      margin: 0 0 20px;
+      color: var(--ink);
+      text-align: center;
+    }
+    section h2 .line {
+      display: block;
+      width: 84px;
+      height: 0;
+      margin: 12px auto 0;
+      border-top: 2px solid var(--signal);
+      box-shadow: 0 0 12px rgba(52,211,153,0.6);
+    }
+    .lead { color: var(--ink-soft); font-size: 1.06rem; }
+    .card {
+      background: linear-gradient(180deg, var(--panel), var(--bg-2));
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px 32px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+    }
+
+    /* Feature grid */
+    .features {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+    }
+    .feature {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 22px 20px;
+    }
+    .feature .emoji { font-size: 1.5rem; display: inline-block; margin-bottom: 8px; }
+    .feature h3 { margin: 0 0 6px; font-size: 1.08rem; color: var(--beam); font-family: "Inter", sans-serif; }
+    .feature p { margin: 0; color: var(--ink-soft); font-size: 0.95rem; }
+
+    /* Antenna chips */
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+    }
+    .chip {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.85rem;
+      color: var(--ink-soft);
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 8px 16px;
+      transition: border-color 0.15s ease, color 0.15s ease;
+    }
+    .chip:hover { border-color: var(--signal); color: var(--ink); }
+
+    .note {
+      margin-top: 22px;
+      color: var(--ink-soft);
+      font-size: 0.9rem;
+      background: var(--panel);
+      border-left: 3px solid var(--warn);
+      border-radius: 8px;
+      padding: 14px 16px;
+    }
+
+    /* Footer */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 30px 24px;
+      text-align: center;
+      color: var(--ink-faint);
+      font-size: 0.9rem;
+    }
+    footer .made {
+      font-family: "JetBrains Mono", monospace;
+      color: var(--signal);
+      margin-bottom: 8px;
+      letter-spacing: 0.1em;
+    }
+    footer a { color: var(--beam); margin: 0 8px; text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+
+    @media (max-width: 520px) {
+      .hero h1 { font-size: 2.2rem; }
+      .brand span.name { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <span class="antenna">📡</span>
+      <span class="name">Antenna Designer</span>
+    </div>
+    <a class="button" href="app/">Launch the Web App</a>
+  </header>
+
+  <main>
+    <section class="hero">
+      <span class="callsign">· · —  antenna analysis  — · ·</span>
+      <h1>Antenna <span class="accent">Designer</span></h1>
+      <p class="tagline">
+        An interactive playground for amateur-radio antennas. Dial in the physical
+        dimensions on the left and watch the radiation patterns, impedance and SWR
+        redraw live on the right &mdash; alongside a to-scale 3D view of the antenna.
+      </p>
+      <div class="cta-row">
+        <a class="button big" href="app/">📡 Start the Designer</a>
+        <a class="ghost" href="https://github.com/dj-on-github/yagiyagi">View on GitHub</a>
+      </div>
+    </section>
+
+    <section>
+      <h2>Design, Then Watch It Radiate<span class="line"></span></h2>
+      <div class="card">
+        <p class="lead">
+          Antenna Designer models a broad set of common ham-radio antennas with
+          parametric physics. Pick a type, adjust element counts, spacing, diameters,
+          heights and feed systems, and the app recomputes gain, front-to-back ratio,
+          feedpoint impedance and bandwidth in real time. The models are simplified
+          approximations built for exploration and intuition &mdash; great for
+          understanding <em>why</em> an antenna behaves the way it does before you
+          confirm a final design in a full-wave solver like NEC / 4nec2.
+        </p>
+      </div>
+    </section>
+
+    <section>
+      <h2>What You'll See<span class="line"></span></h2>
+      <div class="features">
+        <div class="feature">
+          <span class="emoji">🎯</span>
+          <h3>Azimuth pattern</h3>
+          <p>Polar horizontal radiation plot, 0 dB outer ring down to &minus;40 dB, forward direction to the right.</p>
+        </div>
+        <div class="feature">
+          <span class="emoji">📐</span>
+          <h3>Elevation pattern</h3>
+          <p>Vertical-plane plot with ground-reflection lobes and real-ground takeoff angles.</p>
+        </div>
+        <div class="feature">
+          <span class="emoji">📈</span>
+          <h3>Impedance &amp; SWR</h3>
+          <p>Swept SWR, resistance and reactance vs frequency, with a 2:1 reference line.</p>
+        </div>
+        <div class="feature">
+          <span class="emoji">🧊</span>
+          <h3>3D geometry</h3>
+          <p>An interactive, to-scale drawing of the antenna. Orbit, pan, zoom and reset.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Antennas It Models<span class="line"></span></h2>
+      <div class="chips">
+        <span class="chip">Yagi-Uda</span>
+        <span class="chip">Dipole</span>
+        <span class="chip">Loop</span>
+        <span class="chip">Waveguide (cantenna)</span>
+        <span class="chip">¼-wave vertical / ground plane</span>
+        <span class="chip">Magnetic loop</span>
+        <span class="chip">Log-periodic array</span>
+        <span class="chip">Parabolic dish</span>
+        <span class="chip">Axial-mode helix</span>
+        <span class="chip">Microstrip patch</span>
+        <span class="chip">Moxon rectangle</span>
+        <span class="chip">Pyramidal horn</span>
+        <span class="chip">Phased verticals</span>
+        <span class="chip">Corner reflector</span>
+      </div>
+    </section>
+
+    <section>
+      <h2>Get On The Air<span class="line"></span></h2>
+      <div class="card">
+        <p class="lead">Run it right now in your browser &mdash; no install required.</p>
+        <div class="cta-row" style="justify-content:flex-start;">
+          <a class="button" href="app/">Open the Web App</a>
+          <a class="ghost" href="https://github.com/dj-on-github/yagiyagi#readme">Read the Docs</a>
+        </div>
+        <p class="note">
+          The app runs entirely in your browser. For the best experience use a
+          desktop-sized window &mdash; the left settings column and right plot column
+          each scroll independently, so it also stays usable on smaller laptop screens.
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="made">73 · built with Flutter &amp; a soldering iron</div>
+    <a href="https://github.com/dj-on-github/yagiyagi">Project on GitHub</a>
+    <a href="https://github.com/dj-on-github/yagiyagi#readme">README</a>
+    <a href="https://github.com/dj-on-github/yagiyagi/issues">Report an issue</a>
+  </footer>
+</body>
+</html>
