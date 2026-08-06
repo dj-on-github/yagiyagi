@@ -1,3 +1,6 @@
+> [!NOTE]
+> Official web site at: [https://dj-on-github.github.io/yagiyagi/](https://dj-on-github.github.io/yagiyagi/).
+
 # Antenna Designer (yagiyagi)
 
 An interactive Flutter application for exploring and comparing common amateur
