@@ -1,0 +1,321 @@
+name: Release
+
+# Builds the desktop apps (Windows, Linux x64/arm64, macOS) and publishes the
+# packaged binaries as assets on a GitHub Release. Nothing is committed back
+# into the repository — the build outputs live only on the Release.
+#
+# Trigger by pushing a version tag, e.g.:
+#   git tag v1.0.0 && git push origin v1.0.0
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build (without leading v), e.g. 1.0.0'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Windows (x64) desktop build
+  # ---------------------------------------------------------------------------
+  build-windows:
+    runs-on: windows-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Determine version
+        id: version
+        shell: pwsh
+        run: |
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            $version = "${{ github.event.inputs.version }}"
+          } else {
+            $version = "${{ github.ref_name }}" -replace '^v', ''
+          }
+          echo "version=$version" >> $env:GITHUB_OUTPUT
+          echo "Version: $version"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build Windows
+        run: flutter build windows --release
+
+      - name: Package Windows zip
+        shell: pwsh
+        run: |
+          $buildDir = "build\windows\x64\runner\Release"
+          Compress-Archive -Path "$buildDir\*" -DestinationPath "yagiyagi-windows-x64.zip" -Force
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64
+          path: yagiyagi-windows-x64.zip
+
+  # ---------------------------------------------------------------------------
+  # Linux (x64 + arm64) desktop build
+  # ---------------------------------------------------------------------------
+  build-linux:
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - arch: x64
+            runner: ubuntu-latest
+            deb_arch: amd64
+            appimagetool_arch: x86_64
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            deb_arch: arm64
+            appimagetool_arch: aarch64
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Version: $VERSION"
+
+      # Flutter publishes prebuilt SDK archives for x64 only, so the marketplace
+      # action works for x64 but fails on arm64. On arm64 we install from git,
+      # whose bootstrap downloads the correct arm64 Dart SDK and engine.
+      - name: Set up Flutter (x64)
+        if: matrix.arch == 'x64'
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Set up Flutter (arm64)
+        if: matrix.arch == 'arm64'
+        run: |
+          git clone https://github.com/flutter/flutter.git --depth 1 --branch stable "$HOME/flutter"
+          git config --global --add safe.directory "$HOME/flutter"
+          echo "$HOME/flutter/bin" >> "$GITHUB_PATH"
+          "$HOME/flutter/bin/flutter" --version
+          "$HOME/flutter/bin/flutter" precache --linux
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build libgtk-3-dev liblzma-dev libstdc++-12-dev pkg-config cmake clang
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build Linux
+        run: flutter build linux --release
+
+      - name: Package tar.gz
+        run: |
+          cd build/linux/${{ matrix.arch }}/release/bundle
+          tar -czf "$GITHUB_WORKSPACE/yagiyagi-linux-${{ matrix.arch }}.tar.gz" .
+
+      - name: Package .deb
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          PKG_DIR="yagiyagi-deb"
+          mkdir -p "$PKG_DIR/DEBIAN"
+          mkdir -p "$PKG_DIR/usr/lib/yagiyagi"
+          mkdir -p "$PKG_DIR/usr/bin"
+          mkdir -p "$PKG_DIR/usr/share/applications"
+          mkdir -p "$PKG_DIR/usr/share/icons/hicolor/512x512/apps"
+
+          cp -r build/linux/${{ matrix.arch }}/release/bundle/* "$PKG_DIR/usr/lib/yagiyagi/"
+          ln -sf /usr/lib/yagiyagi/yagiyagi "$PKG_DIR/usr/bin/yagiyagi"
+
+          cat > "$PKG_DIR/usr/share/applications/yagiyagi.desktop" <<EOF
+          [Desktop Entry]
+          Name=Antenna Designer
+          Comment=Interactive amateur-radio antenna analysis and design
+          Exec=/usr/bin/yagiyagi
+          Icon=yagiyagi
+          Type=Application
+          Categories=Education;HamRadio;Science;
+          Terminal=false
+          EOF
+          sed -i 's/^          //' "$PKG_DIR/usr/share/applications/yagiyagi.desktop"
+
+          cp web/icons/Icon-512.png \
+            "$PKG_DIR/usr/share/icons/hicolor/512x512/apps/yagiyagi.png"
+
+          cat > "$PKG_DIR/DEBIAN/control" <<EOF
+          Package: yagiyagi
+          Version: ${VERSION}
+          Section: hamradio
+          Priority: optional
+          Architecture: ${{ matrix.deb_arch }}
+          Depends: libgtk-3-0
+          Maintainer: Antenna Designer <yagiyagi@users.noreply.github.com>
+          Description: Antenna Designer antenna analysis tool
+           An interactive amateur-radio antenna designer with live radiation
+           patterns, impedance/SWR plots and a to-scale 3D geometry view for a
+           broad set of common antenna types.
+          EOF
+          sed -i 's/^          //' "$PKG_DIR/DEBIAN/control"
+
+          dpkg-deb --build "$PKG_DIR" "yagiyagi-linux-${{ matrix.arch }}.deb"
+
+      - name: Package AppImage
+        run: |
+          APPDIR="Antenna_Designer.AppDir"
+          mkdir -p "$APPDIR/usr/bin"
+          mkdir -p "$APPDIR/usr/share/applications"
+          mkdir -p "$APPDIR/usr/share/icons/hicolor/512x512/apps"
+
+          cp -r build/linux/${{ matrix.arch }}/release/bundle/* "$APPDIR/usr/bin/"
+
+          cat > "$APPDIR/yagiyagi.desktop" <<EOF
+          [Desktop Entry]
+          Name=Antenna Designer
+          Comment=Interactive amateur-radio antenna analysis and design
+          Exec=yagiyagi
+          Icon=yagiyagi
+          Type=Application
+          Categories=Education;HamRadio;Science;
+          Terminal=false
+          EOF
+          sed -i 's/^          //' "$APPDIR/yagiyagi.desktop"
+          cp "$APPDIR/yagiyagi.desktop" "$APPDIR/usr/share/applications/yagiyagi.desktop"
+
+          cp web/icons/Icon-512.png "$APPDIR/yagiyagi.png"
+          cp web/icons/Icon-512.png "$APPDIR/usr/share/icons/hicolor/512x512/apps/yagiyagi.png"
+
+          cat > "$APPDIR/AppRun" <<'EOF'
+          #!/bin/bash
+          SELF=$(readlink -f "$0")
+          HERE=${SELF%/*}
+          export PATH="${HERE}/usr/bin:${PATH}"
+          export LD_LIBRARY_PATH="${HERE}/usr/bin/lib:${HERE}/usr/lib:${LD_LIBRARY_PATH}"
+          exec "${HERE}/usr/bin/yagiyagi" "$@"
+          EOF
+          sed -i 's/^          //' "$APPDIR/AppRun"
+          chmod +x "$APPDIR/AppRun"
+
+          wget -q "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-${{ matrix.appimagetool_arch }}.AppImage" -O appimagetool
+          chmod +x appimagetool
+          ARCH=${{ matrix.appimagetool_arch }} ./appimagetool --no-appstream "$APPDIR" "yagiyagi-linux-${{ matrix.arch }}.AppImage"
+
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-${{ matrix.arch }}
+          path: |
+            yagiyagi-linux-${{ matrix.arch }}.tar.gz
+            yagiyagi-linux-${{ matrix.arch }}.deb
+            yagiyagi-linux-${{ matrix.arch }}.AppImage
+
+  # ---------------------------------------------------------------------------
+  # macOS desktop build
+  # ---------------------------------------------------------------------------
+  build-macos:
+    runs-on: macos-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Version: $VERSION"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build macOS (unsigned)
+        run: |
+          # CI can't use Xcode automatic signing (no "Mac Development" cert),
+          # so build unsigned here.
+          {
+            echo 'CODE_SIGN_IDENTITY='
+            echo 'CODE_SIGNING_REQUIRED=NO'
+            echo 'CODE_SIGNING_ALLOWED=NO'
+          } >> macos/Runner/Configs/Release.xcconfig
+          flutter build macos --release
+
+      - name: Create DMG
+        run: |
+          APP_PATH=$(find build/macos/Build/Products/Release -name "*.app" -maxdepth 1 | head -1)
+          DMG_NAME="yagiyagi-macos.dmg"
+          VOLUME_NAME="Antenna Designer"
+          STAGING_DIR="dmg_staging"
+
+          echo "Found app: $APP_PATH"
+          mkdir -p "$STAGING_DIR"
+          cp -R "$APP_PATH" "$STAGING_DIR/"
+          ln -s /Applications "$STAGING_DIR/Applications"
+
+          hdiutil create -volname "$VOLUME_NAME" -srcfolder "$STAGING_DIR" -ov -format UDZO -imagekey zlib-level=9 -o "$DMG_NAME"
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: yagiyagi-macos.dmg
+
+  # ---------------------------------------------------------------------------
+  # Publish GitHub Release with all desktop artifacts
+  # ---------------------------------------------------------------------------
+  release:
+    needs: [build-windows, build-linux, build-macos]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: Determine tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=v${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: Antenna Designer ${{ steps.tag.outputs.tag }}
+          generate_release_notes: true
+          files: |
+            artifacts/windows-x64/yagiyagi-windows-x64.zip
+            artifacts/linux-x64/yagiyagi-linux-x64.tar.gz
+            artifacts/linux-x64/yagiyagi-linux-x64.deb
+            artifacts/linux-x64/yagiyagi-linux-x64.AppImage
+            artifacts/linux-arm64/yagiyagi-linux-arm64.tar.gz
+            artifacts/linux-arm64/yagiyagi-linux-arm64.deb
+            artifacts/linux-arm64/yagiyagi-linux-arm64.AppImage
+            artifacts/macos/yagiyagi-macos.dmg

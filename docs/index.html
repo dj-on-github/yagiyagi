@@ -203,6 +203,42 @@
     }
     .chip:hover { border-color: var(--signal); color: var(--ink); }
 
+    /* Downloads */
+    .downloads {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+    }
+    .dl {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 22px 20px;
+      text-align: center;
+    }
+    .dl .os { font-size: 1.9rem; display: block; margin-bottom: 6px; }
+    .dl h3 { margin: 0 0 2px; font-size: 1.1rem; color: var(--beam); font-family: "Inter", sans-serif; }
+    .dl .arch { margin: 0 0 14px; color: var(--ink-faint); font-size: 0.85rem; font-family: "JetBrains Mono", monospace; }
+    .dl .links { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+    a.pill {
+      display: inline-block;
+      background: linear-gradient(135deg, var(--signal), var(--signal-dark));
+      color: #05140e;
+      text-decoration: none;
+      padding: 9px 18px;
+      border-radius: 999px;
+      font-size: 0.9rem;
+      font-weight: 700;
+      transition: transform 0.15s ease;
+    }
+    a.pill:hover { transform: translateY(-1px); }
+    a.pill.alt {
+      background: var(--panel-2);
+      color: var(--ink);
+      border: 1px solid var(--border);
+    }
+    a.pill.alt:hover { border-color: var(--beam); }
+
     .note {
       margin-top: 22px;
       color: var(--ink-soft);
@@ -327,7 +363,7 @@
         <p class="lead">Run it right now in your browser &mdash; no install required.</p>
         <div class="cta-row" style="justify-content:flex-start;">
           <a class="button" href="app/">Open the Web App</a>
-          <a class="ghost" href="https://github.com/dj-on-github/yagiyagi#readme">Read the Docs</a>
+          <a class="ghost" href="#download">Desktop downloads &darr;</a>
         </div>
         <p class="note">
           The app runs entirely in your browser. For the best experience use a
@@ -335,6 +371,57 @@
           each scroll independently, so it also stays usable on smaller laptop screens.
         </p>
       </div>
+    </section>
+
+    <section id="download">
+      <h2>Desktop Downloads<span class="line"></span></h2>
+      <p class="lead" style="text-align:center;">
+        Prefer a native app? Grab the latest build for your platform. These links
+        always point at the most recent release.
+      </p>
+      <div class="downloads">
+        <div class="dl">
+          <span class="os">🖥️</span>
+          <h3>Windows</h3>
+          <p class="arch">x64 · portable zip</p>
+          <div class="links">
+            <a class="pill" href="https://github.com/dj-on-github/yagiyagi/releases/latest/download/yagiyagi-windows-x64.zip">Download .zip</a>
+          </div>
+        </div>
+        <div class="dl">
+          <span class="os">🍎</span>
+          <h3>macOS</h3>
+          <p class="arch">Universal disk image</p>
+          <div class="links">
+            <a class="pill" href="https://github.com/dj-on-github/yagiyagi/releases/latest/download/yagiyagi-macos.dmg">Download .dmg</a>
+          </div>
+        </div>
+        <div class="dl">
+          <span class="os">🐧</span>
+          <h3>Linux (x64)</h3>
+          <p class="arch">AppImage, .deb or tarball</p>
+          <div class="links">
+            <a class="pill" href="https://github.com/dj-on-github/yagiyagi/releases/latest/download/yagiyagi-linux-x64.AppImage">AppImage</a>
+            <a class="pill alt" href="https://github.com/dj-on-github/yagiyagi/releases/latest/download/yagiyagi-linux-x64.deb">.deb</a>
+            <a class="pill alt" href="https://github.com/dj-on-github/yagiyagi/releases/latest/download/yagiyagi-linux-x64.tar.gz">.tar.gz</a>
+          </div>
+        </div>
+        <div class="dl">
+          <span class="os">🐧</span>
+          <h3>Linux (arm64)</h3>
+          <p class="arch">AppImage, .deb or tarball</p>
+          <div class="links">
+            <a class="pill" href="https://github.com/dj-on-github/yagiyagi/releases/latest/download/yagiyagi-linux-arm64.AppImage">AppImage</a>
+            <a class="pill alt" href="https://github.com/dj-on-github/yagiyagi/releases/latest/download/yagiyagi-linux-arm64.deb">.deb</a>
+            <a class="pill alt" href="https://github.com/dj-on-github/yagiyagi/releases/latest/download/yagiyagi-linux-arm64.tar.gz">.tar.gz</a>
+          </div>
+        </div>
+      </div>
+      <p class="note">
+        All releases are listed on the
+        <a href="https://github.com/dj-on-github/yagiyagi/releases">GitHub Releases page</a>.
+        Desktop builds are unsigned, so your OS may warn on first launch.
+      </p>
     </section>
   </main>
 

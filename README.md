@@ -8,6 +8,21 @@ radio antenna designs. Adjust the physical parameters of an antenna on the
 left and watch its radiation patterns and impedance behaviour update live on
 the right.
 
+## Downloads
+
+**Run it now in your browser: [Launch the Web App](https://dj-on-github.github.io/yagiyagi/app/)** — no install required.
+
+Pre-built desktop applications are published on the
+[Releases page](https://github.com/dj-on-github/yagiyagi/releases). The links
+below always point at the latest release:
+
+| Platform | Download |
+| --- | --- |
+| Windows (x64) | [yagiyagi-windows-x64.zip](https://github.com/dj-on-github/yagiyagi/releases/latest/download/yagiyagi-windows-x64.zip) |
+| macOS | [yagiyagi-macos.dmg](https://github.com/dj-on-github/yagiyagi/releases/latest/download/yagiyagi-macos.dmg) |
+| Linux (x64) | [.AppImage](https://github.com/dj-on-github/yagiyagi/releases/latest/download/yagiyagi-linux-x64.AppImage) · [.deb](https://github.com/dj-on-github/yagiyagi/releases/latest/download/yagiyagi-linux-x64.deb) · [.tar.gz](https://github.com/dj-on-github/yagiyagi/releases/latest/download/yagiyagi-linux-x64.tar.gz) |
+| Linux (arm64) | [.AppImage](https://github.com/dj-on-github/yagiyagi/releases/latest/download/yagiyagi-linux-arm64.AppImage) · [.deb](https://github.com/dj-on-github/yagiyagi/releases/latest/download/yagiyagi-linux-arm64.deb) · [.tar.gz](https://github.com/dj-on-github/yagiyagi/releases/latest/download/yagiyagi-linux-arm64.tar.gz) |
+
 ## Supported antenna types
 
 Select the antenna type from the pull-down at the top of the left panel:
