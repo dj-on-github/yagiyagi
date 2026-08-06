@@ -13,6 +13,7 @@ import 'loop_model.dart';
 import 'lpda_model.dart';
 import 'magloop_model.dart';
 import 'moxon_model.dart';
+import 'nful_export.dart';
 import 'panels.dart';
 import 'patch_model.dart';
 import 'phased_array_model.dart';
@@ -126,6 +127,34 @@ class _DesignerPageState extends State<DesignerPage> {
 
   void _update(VoidCallback fn) => setState(fn);
 
+  /// Export the current design as a NECfull .nful wire model.
+  Future<void> _exportNful() async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final model = nfulForDesign(
+        type: _type,
+        yagi: _yagi,
+        dipole: _dipole,
+        loop: _loop,
+        vertical: _vertical,
+        magLoop: _magLoop,
+        lpda: _lpda,
+        helix: _helix,
+        moxon: _moxon,
+        phased: _phased,
+        corner: _corner,
+      );
+      final msg = await saveNfulDialog(model);
+      if (msg != null) {
+        messenger.showSnackBar(SnackBar(content: Text(msg)));
+      }
+    } on ArgumentError catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e.message.toString())));
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text('Export failed: $e')));
+    }
+  }
+
   @override
   void dispose() {
     _leftScroll.dispose();
@@ -143,6 +172,13 @@ class _DesignerPageState extends State<DesignerPage> {
       appBar: AppBar(
         title: const Text('Antenna Designer'),
         actions: [
+          IconButton(
+            tooltip: nfulExportBlockedReason(_type) ??
+                'Export to NECfull (.nful) for MoM analysis',
+            icon: const Icon(Icons.save_alt),
+            onPressed:
+                nfulExportBlockedReason(_type) == null ? _exportNful : null,
+          ),
           Padding(
             padding: const EdgeInsets.only(right: 16),
             child: Center(
